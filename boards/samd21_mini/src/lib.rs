@@ -17,7 +17,13 @@ use hal::prelude::*;
 pub use hal::usb;
 pub use hal::*;
 
-use gpio::{Floating, Input, Port};
+use gpio::{Floating, Input, Port, IntoFunction};
+use hal::clock::GenericClockController;
+
+#[cfg(feature = "usb")]
+pub use hal::usb::UsbBus;
+#[cfg(feature = "usb")]
+use usb_device::bus::UsbBusWrapper;
 
 define_pins!(
     /// Maps the pins to their arduino names and
@@ -56,3 +62,25 @@ define_pins!(
     pin dm = a24,
     pin dp = a25,
 );
+
+#[cfg(feature = "usb")]
+pub fn usb_bus(
+    usb: USB,
+    clocks: &mut GenericClockController,
+    pm: &mut PM,
+    dm: gpio::Pa24<Input<Floating>>,
+    dp: gpio::Pa25<Input<Floating>>,
+    port: &mut Port,
+) -> UsbBusWrapper<UsbBus> {
+    let gclk0 = clocks.gclk0();
+    dbgprint!("making usb clock");
+    let usb_clock = &clocks.usb(&gclk0).unwrap();
+    dbgprint!("got clock");
+    UsbBusWrapper::new(UsbBus::new(
+        usb_clock,
+        pm,
+        dm.into_function(port),
+        dp.into_function(port),
+        usb,
+    ))
+}
